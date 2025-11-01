@@ -11,3 +11,5 @@
 > `com.unity.ide.kiro` to `com.furkann-ahmet.ide.kiro` to prevent potential issues with Unity regarding attribution.  
 > Violating these attribution rules may trigger warnings in Unity.  
 > If you experience errors during the update, please remove the existing package before reinstalling the new one to avoid conflicts.
+
+> You can check original repo https://github.com/boxqkrtm/com.unity.ide.cursor
