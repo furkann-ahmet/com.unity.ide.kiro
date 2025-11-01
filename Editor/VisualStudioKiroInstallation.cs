@@ -14,78 +14,92 @@ using SimpleJSON;
 using IOPath = System.IO.Path;
 using Debug = UnityEngine.Debug;
 
-namespace Microsoft.Unity.VisualStudio.Editor {
-	internal class VisualStudioKiroInstallation : VisualStudioInstallation {
-		private static readonly IGenerator _generator = new SdkStyleProjectGeneration();
+namespace Microsoft.Unity.VisualStudio.Editor
+{
+    internal class VisualStudioKiroInstallation : VisualStudioInstallation
+    {
+        private static readonly IGenerator _generator = new SdkStyleProjectGeneration();
 
-		public override bool SupportsAnalyzers {
-			get {
-				return true;
-			}
-		}
+        public override bool SupportsAnalyzers
+        {
+            get
+            {
+                return true;
+            }
+        }
 
-		public override Version LatestLanguageVersionSupported {
-			get {
-				return new Version(11, 0);
-			}
-		}
+        public override Version LatestLanguageVersionSupported
+        {
+            get
+            {
+                return new Version(11, 0);
+            }
+        }
 
-		private string GetExtensionPath() {
-			var vscode = IsPrerelease ? ".vscode-insiders" : ".vscode";
-			var extensionsPath = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), vscode, "extensions");
-			if (!Directory.Exists(extensionsPath))
-				return null;
+        private string GetExtensionPath()
+        {
+            var vscode = IsPrerelease ? ".vscode-insiders" : ".vscode";
+            var extensionsPath = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), vscode, "extensions");
+            if (!Directory.Exists(extensionsPath))
+                return null;
 
-			return Directory
-				.EnumerateDirectories(extensionsPath, $"{MicrosoftUnityExtensionId}*") // publisherid.extensionid
-				.OrderByDescending(n => n)
-				.FirstOrDefault();
-		}
+            return Directory
+                .EnumerateDirectories(extensionsPath, $"{MicrosoftUnityExtensionId}*") // publisherid.extensionid
+                .OrderByDescending(n => n)
+                .FirstOrDefault();
+        }
 
-		public override string[] GetAnalyzers() {
-			var vstuPath = GetExtensionPath();
-			if (string.IsNullOrEmpty(vstuPath))
-				return Array.Empty<string>();
+        public override string[] GetAnalyzers()
+        {
+            var vstuPath = GetExtensionPath();
+            if (string.IsNullOrEmpty(vstuPath))
+                return Array.Empty<string>();
 
-			return GetAnalyzers(vstuPath);
-		}
+            return GetAnalyzers(vstuPath);
+        }
 
-		public override IGenerator ProjectGenerator {
-			get {
-				return _generator;
-			}
-		}
+        public override IGenerator ProjectGenerator
+        {
+            get
+            {
+                return _generator;
+            }
+        }
 
-		private static bool IsCandidateForDiscovery(string path) {
+        private static bool IsCandidateForDiscovery(string path)
+        {
 #if UNITY_EDITOR_OSX
 			return Directory.Exists(path) && Regex.IsMatch(path, ".*Kiro.*.app$", RegexOptions.IgnoreCase);
 #elif UNITY_EDITOR_WIN
 			return File.Exists(path) && Regex.IsMatch(path, ".*Kiro.*.exe$", RegexOptions.IgnoreCase);
 #else
-			return File.Exists(path) && path.EndsWith("kiro", StringComparison.OrdinalIgnoreCase);
+            return File.Exists(path) && path.EndsWith("kiro", StringComparison.OrdinalIgnoreCase);
 #endif
-		}
+        }
 
-		[Serializable]
-		internal class VisualStudioCodeManifest {
-			public string name;
-			public string version;
-		}
+        [Serializable]
+        internal class VisualStudioCodeManifest
+        {
+            public string name;
+            public string version;
+        }
 
-		public static bool TryDiscoverInstallation(string editorPath, out IVisualStudioInstallation installation) {
-			installation = null;
+        public static bool TryDiscoverInstallation(string editorPath, out IVisualStudioInstallation installation)
+        {
+            installation = null;
 
-			if (string.IsNullOrEmpty(editorPath))
-				return false;
+            if (string.IsNullOrEmpty(editorPath))
+                return false;
 
-			if (!IsCandidateForDiscovery(editorPath))
-				return false;
+            if (!IsCandidateForDiscovery(editorPath))
+                return false;
 
-			Version version = null;
-			var isPrerelease = false;
+            Version version = null;
+            var isPrerelease = false;
 
-			try {
-				var manifestBase = GetRealPath(editorPath);
+            try
+            {
+                var manifestBase = GetRealPath(editorPath);
 
 #if UNITY_EDITOR_WIN
 				// on Windows, editorPath is a file, resources as subdirectory
@@ -94,38 +108,43 @@ namespace Microsoft.Unity.VisualStudio.Editor {
 				// on Mac, editorPath is a directory
 				manifestBase = IOPath.Combine(manifestBase, "Contents");
 #else
-				// on Linux, editorPath is a file, in a bin sub-directory
-				var parent = Directory.GetParent(manifestBase);
-				// but we can link to [vscode]/code or [vscode]/bin/code
-				manifestBase = parent?.Name == "bin" ? parent.Parent?.FullName : parent?.FullName;
+                // on Linux, editorPath is a file, in a bin sub-directory
+                var parent = Directory.GetParent(manifestBase);
+                // but we can link to [vscode]/code or [vscode]/bin/code
+                manifestBase = parent?.Name == "bin" ? parent.Parent?.FullName : parent?.FullName;
 #endif
 
-				if (manifestBase == null)
-					return false;
+                if (manifestBase == null)
+                    return false;
 
-				var manifestFullPath = IOPath.Combine(manifestBase, "resources", "app", "package.json");
-				if (File.Exists(manifestFullPath)) {
-					var manifest = JsonUtility.FromJson<VisualStudioCodeManifest>(File.ReadAllText(manifestFullPath));
-					Version.TryParse(manifest.version.Split('-').First(), out version);
-					isPrerelease = manifest.version.ToLower().Contains("insider");
-				}
-			} catch (Exception) {
-				// do not fail if we are not able to retrieve the exact version number
-			}
+                var manifestFullPath = IOPath.Combine(manifestBase, "resources", "app", "package.json");
+                if (File.Exists(manifestFullPath))
+                {
+                    var manifest = JsonUtility.FromJson<VisualStudioCodeManifest>(File.ReadAllText(manifestFullPath));
+                    Version.TryParse(manifest.version.Split('-').First(), out version);
+                    isPrerelease = manifest.version.ToLower().Contains("insider");
+                }
+            }
+            catch (Exception)
+            {
+                // do not fail if we are not able to retrieve the exact version number
+            }
 
-			isPrerelease = isPrerelease || editorPath.ToLower().Contains("insider");
-			installation = new VisualStudioKiroInstallation() {
-				IsPrerelease = isPrerelease,
-				Name = "Kiro" + (isPrerelease ? " - Insider" : string.Empty) + (version != null ? $" [{version.ToString(3)}]" : string.Empty),
-				Path = editorPath,
-				Version = version ?? new Version()
-			};
+            isPrerelease = isPrerelease || editorPath.ToLower().Contains("insider");
+            installation = new VisualStudioKiroInstallation()
+            {
+                IsPrerelease = isPrerelease,
+                Name = "Kiro" + (isPrerelease ? " - Insider" : string.Empty) + (version != null ? $" [{version.ToString(3)}]" : string.Empty),
+                Path = editorPath,
+                Version = version ?? new Version()
+            };
 
-			return true;
-		}
+            return true;
+        }
 
-		public static IEnumerable<IVisualStudioInstallation> GetVisualStudioInstallations() {
-			var candidates = new List<string>();
+        public static IEnumerable<IVisualStudioInstallation> GetVisualStudioInstallations()
+        {
+            var candidates = new List<string>();
 
 #if UNITY_EDITOR_WIN
 			var localAppPath = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
@@ -147,11 +166,12 @@ namespace Microsoft.Unity.VisualStudio.Editor {
 			candidates.AddRange(GetXdgCandidates());
 #endif
 
-			foreach (var candidate in candidates.Distinct()) {
-				if (TryDiscoverInstallation(candidate, out var installation))
-					yield return installation;
-			}
-		}
+            foreach (var candidate in candidates.Distinct())
+            {
+                if (TryDiscoverInstallation(candidate, out var installation))
+                    yield return installation;
+            }
+        }
 
 #if UNITY_EDITOR_LINUX
 		private static readonly Regex DesktopFileExecEntry = new Regex(@"Exec=(\S+)", RegexOptions.Singleline | RegexOptions.Compiled);
@@ -202,26 +222,31 @@ namespace Microsoft.Unity.VisualStudio.Editor {
 			return new String(cbuf, 0, chars);
 		}
 #else
-		internal static string GetRealPath(string path) {
-			return path;
-		}
+        internal static string GetRealPath(string path)
+        {
+            return path;
+        }
 #endif
 
-		public override void CreateExtraFiles(string projectDirectory) {
-			try {
-				var vscodeDirectory = IOPath.Combine(projectDirectory.NormalizePathSeparators(), ".vscode");
-				Directory.CreateDirectory(vscodeDirectory);
+        public override void CreateExtraFiles(string projectDirectory)
+        {
+            try
+            {
+                var vscodeDirectory = IOPath.Combine(projectDirectory.NormalizePathSeparators(), ".vscode");
+                Directory.CreateDirectory(vscodeDirectory);
 
-				var enablePatch = !File.Exists(IOPath.Combine(vscodeDirectory, ".vstupatchdisable"));
+                var enablePatch = !File.Exists(IOPath.Combine(vscodeDirectory, ".vstupatchdisable"));
 
-				CreateRecommendedExtensionsFile(vscodeDirectory, enablePatch);
-				CreateSettingsFile(vscodeDirectory, enablePatch);
-				CreateLaunchFile(vscodeDirectory, enablePatch);
-			} catch (IOException) {
-			}
-		}
+                CreateRecommendedExtensionsFile(vscodeDirectory, enablePatch);
+                CreateSettingsFile(vscodeDirectory, enablePatch);
+                CreateLaunchFile(vscodeDirectory, enablePatch);
+            }
+            catch (IOException)
+            {
+            }
+        }
 
-		private const string DefaultLaunchFileContent = @"{
+        private const string DefaultLaunchFileContent = @"{
     ""version"": ""0.2.0"",
     ""configurations"": [
         {
@@ -232,54 +257,63 @@ namespace Microsoft.Unity.VisualStudio.Editor {
      ]
 }";
 
-		private static void CreateLaunchFile(string vscodeDirectory, bool enablePatch) {
-			var launchFile = IOPath.Combine(vscodeDirectory, "launch.json");
-			if (File.Exists(launchFile)) {
-				if (enablePatch)
-					PatchLaunchFile(launchFile);
+        private static void CreateLaunchFile(string vscodeDirectory, bool enablePatch)
+        {
+            var launchFile = IOPath.Combine(vscodeDirectory, "launch.json");
+            if (File.Exists(launchFile))
+            {
+                if (enablePatch)
+                    PatchLaunchFile(launchFile);
 
-				return;
-			}
+                return;
+            }
 
-			File.WriteAllText(launchFile, DefaultLaunchFileContent);
-		}
+            File.WriteAllText(launchFile, DefaultLaunchFileContent);
+        }
 
-		private static void PatchLaunchFile(string launchFile) {
-			try {
-				const string configurationsKey = "configurations";
-				const string typeKey = "type";
+        private static void PatchLaunchFile(string launchFile)
+        {
+            try
+            {
+                const string configurationsKey = "configurations";
+                const string typeKey = "type";
 
-				var content = File.ReadAllText(launchFile);
-				var launch = JSONNode.Parse(content);
+                var content = File.ReadAllText(launchFile);
+                var launch = JSONNode.Parse(content);
 
-				var configurations = launch[configurationsKey] as JSONArray;
-				if (configurations == null) {
-					configurations = new JSONArray();
-					launch.Add(configurationsKey, configurations);
-				}
+                var configurations = launch[configurationsKey] as JSONArray;
+                if (configurations == null)
+                {
+                    configurations = new JSONArray();
+                    launch.Add(configurationsKey, configurations);
+                }
 
-				if (configurations.Linq.Any(entry => entry.Value[typeKey].Value == "vstuc"))
-					return;
+                if (configurations.Linq.Any(entry => entry.Value[typeKey].Value == "vstuc"))
+                    return;
 
-				var defaultContent = JSONNode.Parse(DefaultLaunchFileContent);
-				configurations.Add(defaultContent[configurationsKey][0]);
+                var defaultContent = JSONNode.Parse(DefaultLaunchFileContent);
+                configurations.Add(defaultContent[configurationsKey][0]);
 
-				WriteAllTextFromJObject(launchFile, launch);
-			} catch (Exception) {
-				// do not fail if we cannot patch the launch.json file
-			}
-		}
+                WriteAllTextFromJObject(launchFile, launch);
+            }
+            catch (Exception)
+            {
+                // do not fail if we cannot patch the launch.json file
+            }
+        }
 
-		private void CreateSettingsFile(string vscodeDirectory, bool enablePatch) {
-			var settingsFile = IOPath.Combine(vscodeDirectory, "settings.json");
-			if (File.Exists(settingsFile)) {
-				if (enablePatch)
-					PatchSettingsFile(settingsFile);
+        private void CreateSettingsFile(string vscodeDirectory, bool enablePatch)
+        {
+            var settingsFile = IOPath.Combine(vscodeDirectory, "settings.json");
+            if (File.Exists(settingsFile))
+            {
+                if (enablePatch)
+                    PatchSettingsFile(settingsFile);
 
-				return;
-			}
+                return;
+            }
 
-			const string excludes = @"    ""files.exclude"": {
+            const string excludes = @"    ""files.exclude"": {
         ""**/.DS_Store"": true,
         ""**/.git"": true,
         ""**/.vs"": true,
@@ -337,133 +371,150 @@ namespace Microsoft.Unity.VisualStudio.Editor {
         ""Temp/"": true
     }";
 
-			var content = @"{
+            var content = @"{
 " + excludes + @",
     ""dotnet.defaultSolution"": """ + IOPath.GetFileName(ProjectGenerator.SolutionFile()) + @"""
 }";
 
-			File.WriteAllText(settingsFile, content);
-		}
+            File.WriteAllText(settingsFile, content);
+        }
 
-		private void PatchSettingsFile(string settingsFile) {
-			try {
-				const string excludesKey = "files.exclude";
-				const string solutionKey = "dotnet.defaultSolution";
+        private void PatchSettingsFile(string settingsFile)
+        {
+            try
+            {
+                const string excludesKey = "files.exclude";
+                const string solutionKey = "dotnet.defaultSolution";
 
-				var content = File.ReadAllText(settingsFile);
-				var settings = JSONNode.Parse(content);
+                var content = File.ReadAllText(settingsFile);
+                var settings = JSONNode.Parse(content);
 
-				var excludes = settings[excludesKey] as JSONObject;
-				if (excludes == null)
-					return;
+                var excludes = settings[excludesKey] as JSONObject;
+                if (excludes == null)
+                    return;
 
-				var patchList = new List<string>();
-				var patched = false;
+                var patchList = new List<string>();
+                var patched = false;
 
-				// Remove files.exclude for solution+project files in the project root
-				foreach (var exclude in excludes) {
-					if (!bool.TryParse(exclude.Value, out var exc) || !exc)
-						continue;
+                // Remove files.exclude for solution+project files in the project root
+                foreach (var exclude in excludes)
+                {
+                    if (!bool.TryParse(exclude.Value, out var exc) || !exc)
+                        continue;
 
-					var key = exclude.Key;
+                    var key = exclude.Key;
 
-					if (!key.EndsWith(".sln") && !key.EndsWith(".csproj"))
-						continue;
+                    if (!key.EndsWith(".sln") && !key.EndsWith(".csproj"))
+                        continue;
 
-					if (!Regex.IsMatch(key, "^(\\*\\*[\\\\\\/])?\\*\\.(sln|csproj)$"))
-						continue;
+                    if (!Regex.IsMatch(key, "^(\\*\\*[\\\\\\/])?\\*\\.(sln|csproj)$"))
+                        continue;
 
-					patchList.Add(key);
-					patched = true;
-				}
+                    patchList.Add(key);
+                    patched = true;
+                }
 
-				// Check default solution
-				var defaultSolution = settings[solutionKey];
-				var solutionFile = IOPath.GetFileName(ProjectGenerator.SolutionFile());
-				if (defaultSolution == null || defaultSolution.Value != solutionFile) {
-					settings[solutionKey] = solutionFile;
-					patched = true;
-				}
+                // Check default solution
+                var defaultSolution = settings[solutionKey];
+                var solutionFile = IOPath.GetFileName(ProjectGenerator.SolutionFile());
+                if (defaultSolution == null || defaultSolution.Value != solutionFile)
+                {
+                    settings[solutionKey] = solutionFile;
+                    patched = true;
+                }
 
-				if (!patched)
-					return;
+                if (!patched)
+                    return;
 
-				foreach (var patch in patchList)
-					excludes.Remove(patch);
+                foreach (var patch in patchList)
+                    excludes.Remove(patch);
 
-				WriteAllTextFromJObject(settingsFile, settings);
-			} catch (Exception) {
-				// do not fail if we cannot patch the settings.json file
-			}
-		}
+                WriteAllTextFromJObject(settingsFile, settings);
+            }
+            catch (Exception)
+            {
+                // do not fail if we cannot patch the settings.json file
+            }
+        }
 
-		private const string MicrosoftUnityExtensionId = "visualstudiotoolsforunity.vstuc";
-		private const string DefaultRecommendedExtensionsContent = @"{
+        private const string MicrosoftUnityExtensionId = "visualstudiotoolsforunity.vstuc";
+        private const string DefaultRecommendedExtensionsContent = @"{
     ""recommendations"": [
       """ + MicrosoftUnityExtensionId + @"""
     ]
 }
 ";
 
-		private static void CreateRecommendedExtensionsFile(string vscodeDirectory, bool enablePatch) {
-			// see https://tattoocoder.com/recommending-vscode-extensions-within-your-open-source-projects/
-			var extensionFile = IOPath.Combine(vscodeDirectory, "extensions.json");
-			if (File.Exists(extensionFile)) {
-				if (enablePatch)
-					PatchRecommendedExtensionsFile(extensionFile);
+        private static void CreateRecommendedExtensionsFile(string vscodeDirectory, bool enablePatch)
+        {
+            // see https://tattoocoder.com/recommending-vscode-extensions-within-your-open-source-projects/
+            var extensionFile = IOPath.Combine(vscodeDirectory, "extensions.json");
+            if (File.Exists(extensionFile))
+            {
+                if (enablePatch)
+                    PatchRecommendedExtensionsFile(extensionFile);
 
-				return;
-			}
+                return;
+            }
 
-			File.WriteAllText(extensionFile, DefaultRecommendedExtensionsContent);
-		}
+            File.WriteAllText(extensionFile, DefaultRecommendedExtensionsContent);
+        }
 
-		private static void PatchRecommendedExtensionsFile(string extensionFile) {
-			try {
-				const string recommendationsKey = "recommendations";
+        private static void PatchRecommendedExtensionsFile(string extensionFile)
+        {
+            try
+            {
+                const string recommendationsKey = "recommendations";
 
-				var content = File.ReadAllText(extensionFile);
-				var extensions = JSONNode.Parse(content);
+                var content = File.ReadAllText(extensionFile);
+                var extensions = JSONNode.Parse(content);
 
-				var recommendations = extensions[recommendationsKey] as JSONArray;
-				if (recommendations == null) {
-					recommendations = new JSONArray();
-					extensions.Add(recommendationsKey, recommendations);
-				}
+                var recommendations = extensions[recommendationsKey] as JSONArray;
+                if (recommendations == null)
+                {
+                    recommendations = new JSONArray();
+                    extensions.Add(recommendationsKey, recommendations);
+                }
 
-				if (recommendations.Linq.Any(entry => entry.Value.Value == MicrosoftUnityExtensionId))
-					return;
+                if (recommendations.Linq.Any(entry => entry.Value.Value == MicrosoftUnityExtensionId))
+                    return;
 
-				recommendations.Add(MicrosoftUnityExtensionId);
-				WriteAllTextFromJObject(extensionFile, extensions);
-			} catch (Exception) {
-				// do not fail if we cannot patch the extensions.json file
-			}
-		}
+                recommendations.Add(MicrosoftUnityExtensionId);
+                WriteAllTextFromJObject(extensionFile, extensions);
+            }
+            catch (Exception)
+            {
+                // do not fail if we cannot patch the extensions.json file
+            }
+        }
 
-		private static void WriteAllTextFromJObject(string file, JSONNode node) {
-			using (var fs = File.Open(file, FileMode.Create))
-			using (var sw = new StreamWriter(fs)) {
-				// Keep formatting/indent in sync with default contents
-				sw.Write(node.ToString(aIndent: 4));
-			}
-		}
+        private static void WriteAllTextFromJObject(string file, JSONNode node)
+        {
+            using (var fs = File.Open(file, FileMode.Create))
+            using (var sw = new StreamWriter(fs))
+            {
+                // Keep formatting/indent in sync with default contents
+                sw.Write(node.ToString(aIndent: 4));
+            }
+        }
 
-		private Process FindRunningKiroWithSolution(string solutionPath) {
-			var normalizedTargetPath = solutionPath.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
-			
+        private Process FindRunningKiroWithSolution(string solutionPath)
+        {
+            var normalizedTargetPath = solutionPath.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+
 #if UNITY_EDITOR_WIN
 			// Keep as is for Windows platform since path already includes drive letter
 #else
-			// Ensure path starts with / for macOS and Linux platforms
-			if (!normalizedTargetPath.StartsWith("/")) {
-				normalizedTargetPath = "/" + normalizedTargetPath;
-			}
+            // Ensure path starts with / for macOS and Linux platforms
+            if (!normalizedTargetPath.StartsWith("/"))
+            {
+                normalizedTargetPath = "/" + normalizedTargetPath;
+            }
 #endif
-			
-			var processes = new List<Process>();
-			
-			// Get process name list based on different operating systems
+
+            var processes = new List<Process>();
+
+            // Get process name list based on different operating systems
 #if UNITY_EDITOR_OSX
 			processes.AddRange(Process.GetProcessesByName("Kiro"));
 			processes.AddRange(Process.GetProcessesByName("Kiro Helper"));
@@ -471,84 +522,96 @@ namespace Microsoft.Unity.VisualStudio.Editor {
 			processes.AddRange(Process.GetProcessesByName("kiro"));
 			processes.AddRange(Process.GetProcessesByName("Kiro"));
 #else
-			processes.AddRange(Process.GetProcessesByName("kiro"));
+            processes.AddRange(Process.GetProcessesByName("kiro"));
 #endif
-			
-			foreach (var process in processes) {
-				try {
-					var workspaces = ProcessRunner.GetProcessWorkspaces(process);
-					if (workspaces != null && workspaces.Length > 0) {
-						foreach (var workspace in workspaces) {
-							var normalizedWorkspaceDir = workspace.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
-							
+
+            foreach (var process in processes)
+            {
+                try
+                {
+                    var workspaces = ProcessRunner.GetProcessWorkspaces(process);
+                    if (workspaces != null && workspaces.Length > 0)
+                    {
+                        foreach (var workspace in workspaces)
+                        {
+                            var normalizedWorkspaceDir = workspace.Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+
 #if UNITY_EDITOR_WIN
 							// Keep as is for Windows platform
 #else
-							// Ensure path starts with / for macOS and Linux platforms
-							if (!normalizedWorkspaceDir.StartsWith("/")) {
-								normalizedWorkspaceDir = "/" + normalizedWorkspaceDir;
-							}
+                            // Ensure path starts with / for macOS and Linux platforms
+                            if (!normalizedWorkspaceDir.StartsWith("/"))
+                            {
+                                normalizedWorkspaceDir = "/" + normalizedWorkspaceDir;
+                            }
 #endif
 
-							if (string.Equals(normalizedWorkspaceDir, normalizedTargetPath, StringComparison.OrdinalIgnoreCase) ||
-								normalizedTargetPath.StartsWith(normalizedWorkspaceDir + "/", StringComparison.OrdinalIgnoreCase) ||
-								normalizedWorkspaceDir.StartsWith(normalizedTargetPath + "/", StringComparison.OrdinalIgnoreCase))
-							{
-								return process;
-							}
-						}
-					}
-				}
-				catch (Exception ex) {
-					Debug.LogError($"[Kiro] Error checking process: {ex}");
-					continue;
-				}
-			}
-			return null;
-		}
+                            if (string.Equals(normalizedWorkspaceDir, normalizedTargetPath, StringComparison.OrdinalIgnoreCase) ||
+                                normalizedTargetPath.StartsWith(normalizedWorkspaceDir + "/", StringComparison.OrdinalIgnoreCase) ||
+                                normalizedWorkspaceDir.StartsWith(normalizedTargetPath + "/", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return process;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[Kiro] Error checking process: {ex}");
+                    continue;
+                }
+            }
+            return null;
+        }
 
-		public override bool Open(string path, int line, int column, string solution) {
-			line = Math.Max(1, line);
-			column = Math.Max(0, column);
+        public override bool Open(string path, int line, int column, string solution)
+        {
+            line = Math.Max(1, line);
+            column = Math.Max(0, column);
 
-			var directory = IOPath.GetDirectoryName(solution);
-			var application = Path;
+            var directory = IOPath.GetDirectoryName(solution);
+            var application = Path;
 
-			var existingProcess = FindRunningKiroWithSolution(directory);
-			if (existingProcess != null) {
-				try {
-					var args = string.IsNullOrEmpty(path) ? 
-						$"--reuse-window \"{directory}\"" : 
-						$"--reuse-window -g \"{path}\":{line}:{column}";
-					
-					ProcessRunner.Start(ProcessStartInfoFor(application, args));
-					return true;
-				}
-				catch (Exception ex) {
-					Debug.LogError($"[Kiro] Error using existing instance: {ex}");
-				}
-			}
+            var existingProcess = FindRunningKiroWithSolution(directory);
+            if (existingProcess != null)
+            {
+                try
+                {
+                    var args = string.IsNullOrEmpty(path) ?
+                        $"--reuse-window \"{directory}\"" :
+                        $"--reuse-window -g \"{path}\":{line}:{column}";
 
-			var newArgs = string.IsNullOrEmpty(path) ?
-				$"--new-window \"{directory}\"" :
-				$"--new-window \"{directory}\" -g \"{path}\":{line}:{column}";
-			
-			ProcessRunner.Start(ProcessStartInfoFor(application, newArgs));
-			return true;
-		}
+                    ProcessRunner.Start(ProcessStartInfoFor(application, args));
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[Kiro] Error using existing instance: {ex}");
+                }
+            }
 
-		private static ProcessStartInfo ProcessStartInfoFor(string application, string arguments) {
+            var newArgs = string.IsNullOrEmpty(path) ?
+                $"--new-window \"{directory}\"" :
+                $"--new-window \"{directory}\" -g \"{path}\":{line}:{column}";
+
+            ProcessRunner.Start(ProcessStartInfoFor(application, newArgs));
+            return true;
+        }
+
+        private static ProcessStartInfo ProcessStartInfoFor(string application, string arguments)
+        {
 #if UNITY_EDITOR_OSX
 			// wrap with built-in OSX open feature
 			arguments = $"-n \"{application}\" --args {arguments}";
 			application = "open";
 			return ProcessRunner.ProcessStartInfoFor(application, arguments, redirect:false, shell: true);
 #else
-			return ProcessRunner.ProcessStartInfoFor(application, arguments, redirect: false);
+            return ProcessRunner.ProcessStartInfoFor(application, arguments, redirect: false);
 #endif
-		}
+        }
 
-		public static void Initialize() {
-		}
-	}
+        public static void Initialize()
+        {
+        }
+    }
 }
